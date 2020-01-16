@@ -15,7 +15,7 @@ import {
     ResultValue, RuntimeError
 } from "../../data/result"
 import {RichTextEditor} from "./text_editor";
-import {SelectCell, UIMessageTarget} from "../util/ui_event"
+import {CellSelected, UIMessageTarget} from "../util/ui_event"
 import {Diff} from '../../util/diff'
 import {details, dropdown} from "../util/tags";
 import {ClientResult, ExecutionInfo} from "../../data/result";
@@ -123,7 +123,7 @@ export abstract class Cell extends UIMessageTarget {
                 this.setUrl();
             }
 
-            this.publish(new SelectCell(this));
+            this.publish(new CellSelected(this));
         }
     }
 

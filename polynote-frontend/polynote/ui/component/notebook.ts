@@ -1,4 +1,11 @@
-import {CellsLoaded, ReprDataRequest, SelectCell, UIMessage, UIMessageTarget} from "../util/ui_event";
+import {
+    CellsLoaded,
+    ReprDataRequest,
+    CellSelected,
+    UIMessage,
+    UIMessageTarget,
+    FocusCell,
+} from "../util/ui_event";
 import {NotebookCellsUI} from "./nb_cells";
 import {KernelUI} from "./kernel_ui";
 import {EditBuffer} from "../../data/edit_buffer";
@@ -18,6 +25,7 @@ import {Either, Left, Right} from "../../data/types";
 import * as Tinycon from "tinycon";
 import CompletionList = languages.CompletionList;
 import SignatureHelp = languages.SignatureHelp;
+import {CurrentNotebook} from "./current_notebook";
 
 const notebooks: Record<string, NotebookUI> = {};
 
@@ -74,9 +82,7 @@ export class NotebookUI extends UIMessageTarget {
 
         this.editBuffer = new EditBuffer();
 
-        // TODO: remove listeners on children.
-
-        this.subscribe(SelectCell, cell => {
+        this.subscribe(CellSelected, cell => {
             const cellTypeSelector = mainUI.toolbarUI.cellToolbar.cellTypeSelector;
             const id = cell.id;
             let i = 0;
@@ -245,13 +251,36 @@ export class NotebookUI extends UIMessageTarget {
                 this.queuedCells = this.queuedCells.filter(item => item !== cellId)
             } else if (status === TaskStatus.Complete || status === TaskStatus.Error) {
                 this.runningCell = undefined;
-                this.queuedCells = this.queuedCells.filter(item => item !== cellId) // just in case
+                this.queuedCells = this.queuedCells.filter(item => item !== cellId); // just in case
+
+                // only notify if this notebook doesn't have focus
+                if (!this.isFocused()) {
+                    Notification.requestPermission().then((result) => {
+                        // Is there really no better way to fetch the favicon??
+                        const favicon = (document.getElementsByTagName('head')[0].querySelector("link[rel*='icon") as HTMLLinkElement).href;
+                        const statusString = status === TaskStatus.Complete ? "Complete" : "Error";
+                        const n = new Notification(path, {body: `Cell ${cellId} ${statusString}`, icon: favicon});
+                        n.addEventListener("click", (ev) => {
+                            this.publish(new FocusCell(path, cellId))
+                        });
+                    });
+                }
             } else if (status === TaskStatus.Queued) {
                 if (!this.queuedCells.includes(cellId)) {
                     this.queuedCells.push(cellId)
                 }
             }
 
+            this.setIconBubble()
+        })
+    }
+
+    isFocused() {
+        return CurrentNotebook.equals(this) && document.hasFocus()
+    }
+
+    setIconBubble() {
+        if (CurrentNotebook.equals(this)) {
             const numRunningOrQueued = this.queuedCells.length + (this.runningCell ? 1 : 0);
             if (numRunningOrQueued <= 0) {
                 Tinycon.setBubble(0);
@@ -259,7 +288,7 @@ export class NotebookUI extends UIMessageTarget {
             } else {
                 Tinycon.setBubble(numRunningOrQueued)
             }
-        })
+        }
     }
 
     close() {
@@ -493,6 +522,13 @@ export class NotebookUI extends UIMessageTarget {
                 this.editBuffer.push(this.localVersion, update);
 
             });
+        }
+    }
+
+    selectCell(cellId: number) {
+        const cell = this.cellUI.getCell(cellId);
+        if (cell) {
+            cell.focus()
         }
     }
 
