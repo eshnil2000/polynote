@@ -471,6 +471,22 @@ export class RenameNotebook extends Message {
     }
 }
 
+export class CopyNotebook extends Message {
+    static codec = combined(shortStr, shortStr).to(CopyNotebook);
+    static get msgTypeId() { return 27; }
+    static unapply(inst: CopyNotebook): ConstructorParameters<typeof RenameNotebook> {
+        return [inst.path, inst.newPath];
+    }
+    constructor(readonly path: string, readonly newPath: string) {
+        super();
+        Object.freeze(this);
+    }
+
+    isResponse(other: Message): boolean {
+        return (other instanceof CopyNotebook) && other.path === this.path;
+    }
+}
+
 export class DeleteNotebook extends Message {
     static codec = combined(shortStr).to(DeleteNotebook);
     static get msgTypeId() { return 26; }
@@ -707,6 +723,7 @@ Message.codecs = [
     RunningKernels,  // 24
     RenameNotebook,  // 25
     DeleteNotebook,  // 26
+    CopyNotebook,    // 27
 ];
 
 
